@@ -76,8 +76,7 @@ export function useAuth() {
   const uploadAvatar = useCallback(async (file: File): Promise<string> => {
     if (!supabaseUser) throw new Error('Oturum bulunamadı')
     return ProfileService.uploadAvatar(supabaseUser.id, file)
-    return data.publicUrl
-  }, [supabase, supabaseUser])
+  }, [supabaseUser])
 
   const signOut = useCallback(async () => {
     await AuthService.signOut()
