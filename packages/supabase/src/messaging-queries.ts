@@ -5,13 +5,25 @@ import type { ConversationType } from '@cevre/shared'
 export const messagingQueries = {
   // ─── KONUŞMALAR ───────────────────────────────────────────────────────────
   
-  /** Kullanıcının tüm konuşmalarını getir */
+  /** Kullanıcının tüm konuşmalarını getir (conversation_participants join table üzerinden) */
   getConversations: (supabase: TypedSupabaseClient, userId: string) =>
     supabase
-      .from('conversations')
-      .select('*')
-      .contains('participants', [userId])
-      .order('last_message_at', { ascending: false, nullsFirst: false }),
+      .from('conversation_participants')
+      .select(`
+        conversation_id,
+        role,
+        is_muted,
+        is_pinned,
+        last_read_at,
+        joined_at,
+        conversation:conversations!conversation_id(
+          id, type, name, avatar_url, description,
+          created_by, last_message_id, last_message_at, created_at, updated_at
+        )
+      `)
+      .eq('user_id', userId)
+      .is('left_at', null)
+      .order('conversation(last_message_at)', { ascending: false, nullsFirst: false }),
 
   /** Tek konuşma detayı */
   getConversationById: (supabase: TypedSupabaseClient, conversationId: string) =>
@@ -46,21 +58,27 @@ export const messagingQueries = {
       .single()
   },
 
-  /** Okunmamış konuşma sayısı */
+  /** Okunmamış konuşma sayısı — conversation_participants ve message_reads üzerinden */
   getUnreadConversationCount: async (supabase: TypedSupabaseClient, userId: string) => {
-    const { data: conversations } = await supabase
-      .from('conversations')
-      .select('id')
-      .contains('participants', [userId])
+    const { data: participations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, last_read_at')
+      .eq('user_id', userId)
+      .is('left_at', null)
     
-    if (!conversations) return 0
+    if (!participations) return 0
     
     let unreadCount = 0
-    for (const conv of conversations) {
-      const { data: count } = await supabase.rpc('get_unread_count', {
-        p_user_id: userId,
-        p_conversation_id: conv.id,
-      })
+    for (const p of participations) {
+      // Kullanıcının son okumasından sonra gelen, kendisi tarafından gönderilmeyen mesaj var mı?
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', p.conversation_id)
+        .neq('sender_id', userId)
+        .is('deleted_at', null)
+        .gt('created_at', p.last_read_at ?? '1970-01-01')
+      
       if (count && count > 0) unreadCount++
     }
     
@@ -83,51 +101,45 @@ export const messagingQueries = {
       .order('created_at', { ascending: false })
       .limit(limit),
 
-  /** Mesaj gönder */
+  /** Mesaj gönder (actual schema: content, type, media_url columns) */
   sendMessage: (
     supabase: TypedSupabaseClient,
     conversationId: string,
     senderId: string,
-    text?: string,
-    attachments?: any[]
+    content?: string,
+    mediaUrl?: string,
+    mediaType?: string,
+    replyToId?: string
   ) =>
     supabase
       .from('messages')
       .insert({
         conversation_id: conversationId,
         sender_id: senderId,
-        text: text ?? null,
-        attachments: attachments ? JSON.stringify(attachments) : null,
+        type: mediaUrl ? (mediaType ?? 'image') : 'text',
+        content: content ?? null,
+        media_url: mediaUrl ?? null,
+        media_type: mediaType ?? null,
+        reply_to_id: replyToId ?? null,
       })
       .select()
       .single(),
 
-  /** Mesajı okundu işaretle */
+  /** Mesajı okundu işaretle — message_reads join table kullanır */
   markAsRead: async (
     supabase: TypedSupabaseClient,
     messageId: string,
     userId: string
-  ) => {
-    const { data: message } = await supabase
-      .from('messages')
-      .select('read_by')
-      .eq('id', messageId)
-      .single()
-    
-    if (!message) return { data: null, error: new Error('Message not found') }
-    
-    const readBy = message.read_by || {}
-    readBy[userId] = new Date().toISOString()
-    
-    return supabase
-      .from('messages')
-      .update({ read_by: readBy })
-      .eq('id', messageId)
+  ) =>
+    supabase
+      .from('message_reads')
+      .upsert({ message_id: messageId, user_id: userId, read_at: new Date().toISOString() },
+        { onConflict: 'message_id,user_id' }
+      )
       .select()
-      .single()
-  },
+      .single(),
 
-  /** Tüm mesajları okundu işaretle */
+  /** Tüm mesajları okundu işaretle — message_reads table upsert */
   markAllAsRead: async (
     supabase: TypedSupabaseClient,
     conversationId: string,
@@ -135,37 +147,35 @@ export const messagingQueries = {
   ) => {
     const { data: messages } = await supabase
       .from('messages')
-      .select('id, read_by')
+      .select('id')
       .eq('conversation_id', conversationId)
       .neq('sender_id', userId)
       .is('deleted_at', null)
     
-    if (!messages) return
+    if (!messages || messages.length === 0) return
     
-    for (const msg of messages) {
-      if (!msg.read_by?.[userId]) {
-        const readBy = msg.read_by || {}
-        readBy[userId] = new Date().toISOString()
-        
-        await supabase
-          .from('messages')
-          .update({ read_by: readBy })
-          .eq('id', msg.id)
-      }
-    }
+    const now = new Date().toISOString()
+    const reads = messages.map((m) => ({
+      message_id: m.id,
+      user_id: userId,
+      read_at: now,
+    }))
+    
+    return supabase
+      .from('message_reads')
+      .upsert(reads, { onConflict: 'message_id,user_id' })
   },
 
-  /** Mesajı düzenle */
+  /** Mesajı düzenle (content column) */
   editMessage: (
     supabase: TypedSupabaseClient,
     messageId: string,
-    newText: string
+    newContent: string
   ) =>
     supabase
       .from('messages')
       .update({
-        text: newText,
-        edited_at: new Date().toISOString(),
+        content: newContent,
       })
       .eq('id', messageId)
       .select()
@@ -218,7 +228,7 @@ export const messagingQueries = {
 
   // ─── REALTIME ─────────────────────────────────────────────────────────────
 
-  /** Konuşma değişikliklerini dinle */
+  /** Konuşma değişikliklerini dinle — conversation_participants table üzerinden */
   subscribeToConversations: (
     supabase: TypedSupabaseClient,
     userId: string,
@@ -227,10 +237,15 @@ export const messagingQueries = {
     supabase
       .channel(`user_conversations_${userId}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
+        schema: 'public',
+        table: 'conversation_participants',
+        filter: `user_id=eq.${userId}`,
+      }, onConversationChange)
+      .on('postgres_changes', {
+        event: 'UPDATE',
         schema: 'public',
         table: 'conversations',
-        filter: `participants.cs.{${userId}}`,
       }, onConversationChange)
       .subscribe(),
 

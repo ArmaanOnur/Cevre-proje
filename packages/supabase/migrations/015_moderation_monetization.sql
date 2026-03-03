@@ -6,6 +6,9 @@
 -- MODERATION & SAFETY
 -- =====================================================================
 
+-- NOTE: report_status already defined in migration 001. We extend the v1 reports table here
+-- instead of recreating the enum.
+
 CREATE TYPE report_category AS ENUM (
   'spam',
   'harassment',
@@ -18,7 +21,9 @@ CREATE TYPE report_category AS ENUM (
   'other'
 );
 
-CREATE TYPE report_status AS ENUM ('pending', 'reviewed', 'resolved', 'dismissed');
+-- Drop the basic v1 reports table (001_initial_schema.sql) and replace with enhanced version
+-- report_status enum already exists from 001 — reuse it
+DROP TABLE IF EXISTS reports CASCADE;
 
 CREATE TABLE reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

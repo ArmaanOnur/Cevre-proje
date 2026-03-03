@@ -54,7 +54,7 @@ npm run agent security "Audit feature"
 npm run swarm:setup
 
 # Set API key
-export ANTHROPIC_API_KEY='your-key'
+export ANTHROPIC_API_KEY=sk-ant-api03-REPLACE_WITH_YOUR_KEY
 
 # Test
 npm run agent team-lead "Analyze project"
