@@ -1,0 +1,38 @@
+{
+  "name": "cevre",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Çevre - Yerel Sosyal Aktivite Platformu (AI Swarm ile geliştir)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web": "npm run dev --workspace=apps/web",
+    "mobile": "npm run start --workspace=apps/mobile",
+    "dev": "npm run web",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:mobile": "npm run build --workspace=apps/mobile",
+    "lint": "npm run lint --workspaces",
+    "type-check": "npm run type-check --workspaces",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules",
+    
+    "swarm": "cd ai-swarm && npm run swarm",
+    "swarm:setup": "cd ai-swarm && npm install",
+    "agent": "cd ai-swarm && npm run agent"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "social",
+    "activities",
+    "nextjs",
+    "react-native",
+    "supabase",
+    "ai-swarm"
+  ],
+  "author": "Çevre Team",
+  "license": "MIT"
+}

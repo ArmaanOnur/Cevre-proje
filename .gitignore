@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+packages/*/node_modules/
+ai-swarm/node_modules/
+
+# Build outputs
+.next/
+.expo/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+ai-swarm/.env
+
+# Logs
+logs/
+*.log
+ai-swarm/logs/*.log
+ai-swarm/logs/swarm-*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test
+coverage/
+.nyc_output/

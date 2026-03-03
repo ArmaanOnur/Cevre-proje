@@ -1,0 +1,6 @@
+{
+  "agent_id": "02-architect",
+  "model": "claude-sonnet-4-20250514",
+  "temperature": 0.3,
+  "max_tokens": 4000
+}

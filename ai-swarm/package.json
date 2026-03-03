@@ -1,0 +1,24 @@
+{
+  "name": "cevre-ai-swarm",
+  "version": "1.0.0",
+  "description": "AI Swarm orchestration system for Çevre project",
+  "main": "orchestrator/swarm-engine.js",
+  "scripts": {
+    "swarm": "node orchestrator/swarm-engine.js",
+    "agent": "node scripts/run-single-agent.js",
+    "setup": "node scripts/setup.js"
+  },
+  "keywords": ["ai", "swarm", "orchestration", "claude", "anthropic"],
+  "author": "Çevre Team",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
