@@ -4,9 +4,11 @@ import { useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth.store'
-import { userQueries } from '@cevre/supabase'
+import { AuthService } from '@/services/auth.service'
+import { ProfileService } from '@/services/profile.service'
+import { isProfileComplete } from '@cevre/shared'
+import { normalizePhoneForSupabase } from '@cevre/shared'
 import type { InsertDto, UpdateDto } from '@cevre/supabase'
-import { normalizePhoneForSupabase, isProfileComplete } from '@cevre/shared'
 
 export function useAuth() {
   const router = useRouter()
@@ -18,25 +20,25 @@ export function useAuth() {
 
   useEffect(() => {
     setLoading(true)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    AuthService.getSession().then(({ data: session }) => {
       setSession(session)
       if (session?.user) loadProfile(session.user.id)
       else setLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = AuthService.onAuthStateChange(async (user, session) => {
       setSession(session)
-      if (session?.user) await loadProfile(session.user.id)
+      if (user) await loadProfile(user.id)
       else reset()
     })
     return () => subscription.unsubscribe()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await userQueries.getProfile(supabase, userId)
-    setProfile(data ?? null)
+    const { data } = await ProfileService.getById(userId)
+    setProfile(data as any ?? null)
     setLoading(false)
     return data
-  }, [supabase, setProfile, setLoading])
+  }, [setProfile, setLoading])
 
   const sendOtp = useCallback(async (rawPhone: string): Promise<string> => {
     const phone = normalizePhoneForSupabase(rawPhone)
@@ -54,44 +56,40 @@ export function useAuth() {
   const createProfile = useCallback(async (data: Omit<InsertDto<'users'>, 'id' | 'phone'>) => {
     if (!supabaseUser) throw new Error('Oturum bulunamadı')
     const insertData: InsertDto<'users'> = { id: supabaseUser.id, phone: supabaseUser.phone ?? '', ...data }
-    const { data: profile, error } = await userQueries.createProfile(supabase, insertData)
+    const { data: created, error } = await supabase.from('users').insert(insertData).select().single()
     if (error) {
-      if (error.code === '23505') return updateProfile(data)
+      if (error.code === '23505') return updateProfile(data as UpdateDto<'users'>)
       throw new Error(error.message)
     }
-    if (profile) setProfile(profile)
-    return profile
+    if (created) setProfile(created as any)
+    return created
   }, [supabase, supabaseUser, setProfile])
 
   const updateProfile = useCallback(async (data: UpdateDto<'users'>) => {
     if (!supabaseUser) throw new Error('Oturum bulunamadı')
-    const { data: updated, error } = await userQueries.updateProfile(supabase, supabaseUser.id, data)
-    if (error) throw new Error(error.message)
-    if (updated) setProfile(updated)
+    const { data: updated, error } = await ProfileService.update(supabaseUser.id, data as Record<string, unknown>)
+    if (error) throw new Error((error as any).message)
+    if (updated) setProfile(updated as any)
     return updated
-  }, [supabase, supabaseUser, setProfile])
+  }, [supabaseUser, setProfile])
 
   const uploadAvatar = useCallback(async (file: File): Promise<string> => {
     if (!supabaseUser) throw new Error('Oturum bulunamadı')
-    const ext = file.name.split('.').pop()
-    const path = `avatars/${supabaseUser.id}.${ext}`
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-    if (error) throw new Error(error.message)
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    return ProfileService.uploadAvatar(supabaseUser.id, file)
     return data.publicUrl
   }, [supabase, supabaseUser])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    await AuthService.signOut()
     reset()
     router.push('/auth')
-  }, [supabase, reset, router])
+  }, [reset, router])
 
   const deleteAccount = useCallback(async () => {
     if (!supabaseUser) return
-    await updateProfile({ is_active: false })
+    await ProfileService.deactivate(supabaseUser.id)
     await signOut()
-  }, [supabaseUser, updateProfile, signOut])
+  }, [supabaseUser, signOut])
 
   return {
     user: supabaseUser, profile, session, isLoading, isAuthenticated,

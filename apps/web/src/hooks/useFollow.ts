@@ -1,9 +1,71 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
+/**
+ * useFollow — T2 Refactor
+ * Reads: useSWR + FollowService
+ * Writes: optimistic follow/unfollow
+ */
+
+import { useCallback } from 'react'
+import useSWR from 'swr'
 import { useAuth } from '@/hooks/useAuth'
-import { followQueries } from '@cevre/supabase'
+import { FollowService } from '@/services/follow.service'
+import { queryKeys } from '@/lib/query-keys'
+
+export function useFollow(targetUserId?: string) {
+  const { user } = useAuth()
+
+  // ── SWR read: follow status ─────────────────────────────────────────────
+  const swrKey = user && targetUserId && user.id !== targetUserId
+    ? queryKeys.followStatus(user.id, targetUserId)
+    : null
+
+  const { data: status, isLoading, error, mutate } = useSWR(
+    swrKey,
+    () => FollowService.getStatus(user!.id, targetUserId!),
+    { revalidateOnFocus: false }
+  )
+
+  const isFollowing = status?.is_following ?? false
+  const isFollower = status?.is_follower ?? false
+  const isMutual = status?.is_mutual ?? false
+  const hasPendingRequest = status?.has_pending_request ?? false
+
+  // ── Write: follow (optimistic) ───────────────────────────────────────────
+  const follow = useCallback(async () => {
+    if (!user || !targetUserId) return
+    mutate({ ...status, is_following: true, has_pending_request: false } as any, { revalidate: false })
+    const { error: err } = await FollowService.follow(targetUserId)
+    if (err) mutate()
+    else mutate()  // refresh actual status (pending vs active)
+  }, [user, targetUserId, status, mutate])
+
+  // ── Write: unfollow (optimistic) ─────────────────────────────────────────
+  const unfollow = useCallback(async () => {
+    if (!user || !targetUserId) return
+    mutate({ ...status, is_following: false, is_mutual: false } as any, { revalidate: false })
+    const { error: err } = await FollowService.unfollow(targetUserId)
+    if (err) mutate()
+  }, [user, targetUserId, status, mutate])
+
+  // ── Write: accept request ────────────────────────────────────────────────
+  const acceptRequest = useCallback(async (followerId: string) => {
+    await FollowService.acceptRequest(followerId)
+    mutate()
+  }, [mutate])
+
+  return {
+    isFollowing,
+    isFollower,
+    isMutual,
+    hasPendingRequest,
+    isLoading,
+    error: error ? String(error) : null,
+    follow,
+    unfollow,
+    acceptRequest,
+  }
+}
 
 export function useFollow(targetUserId?: string) {
   const supabase = createClient()

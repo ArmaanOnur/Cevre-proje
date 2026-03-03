@@ -1,11 +1,86 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
+/**
+ * useNotifications — T2 Refactor
+ * Reads: useSWR + NotificationService
+ * Realtime: Supabase channel → optimistic mutate
+ */
+
+import { useEffect, useCallback } from 'react'
+import useSWR from 'swr'
 import { useAuth } from '@/hooks/useAuth'
-import { notificationQueries } from '@cevre/supabase'
-import type { Notification, NotificationCounts } from '@cevre/shared'
-import { groupNotificationCounts } from '@cevre/shared'
+import { NotificationService } from '@/services/notification.service'
+import { queryKeys } from '@/lib/query-keys'
+import type { Notification } from '@cevre/shared'
+
+export function useNotifications() {
+  const { user } = useAuth()
+
+  // ── SWR read: notifications ─────────────────────────────────────────────
+  const { data: notifications = [], isLoading, error, mutate } = useSWR<Notification[]>(
+    user ? queryKeys.notifications(user.id) : null,
+    () => NotificationService.getAll(user!.id)
+      .then(r => { if (r.error) throw r.error; return (r.data ?? []) as Notification[] }),
+    { revalidateOnFocus: false, refreshInterval: 60_000 }
+  )
+
+  const unreadCount = notifications.filter(n => !n.is_read).length
+  const counts = NotificationService.computeCounts(notifications as any[])
+
+  // ── Realtime: new notifications ─────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    const channel = NotificationService.subscribe(user.id, (newNotif) => {
+      mutate(prev => [newNotif as Notification, ...(prev ?? [])], { revalidate: false })
+      NotificationService.showBrowserNotification(
+        (newNotif as any).title,
+        (newNotif as any).body,
+        (newNotif as any).id
+      )
+    })
+    return () => { channel.unsubscribe() }
+  }, [user, mutate])
+
+  // ── Write: mark single as read ───────────────────────────────────────────
+  const markAsRead = useCallback(async (notificationId: string) => {
+    mutate(
+      prev => prev?.map(n => n.id === notificationId ? { ...n, is_read: true } : n),
+      { revalidate: false }
+    )
+    await NotificationService.markAsRead(notificationId)
+  }, [mutate])
+
+  // ── Write: mark all as read ──────────────────────────────────────────────
+  const markAllAsRead = useCallback(async () => {
+    if (!user) return
+    mutate(prev => prev?.map(n => ({ ...n, is_read: true })), { revalidate: false })
+    await NotificationService.markAllAsRead(user.id)
+  }, [user, mutate])
+
+  // ── Write: delete notification ────────────────────────────────────────────
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    mutate(prev => prev?.filter(n => n.id !== notificationId), { revalidate: false })
+    await NotificationService.delete(notificationId)
+  }, [mutate])
+
+  // ── Browser push permission ──────────────────────────────────────────────
+  const requestPushPermission = useCallback(
+    () => NotificationService.requestBrowserPermission(), []
+  )
+
+  return {
+    notifications,
+    unreadCount,
+    counts,
+    isLoading,
+    error: error ? String(error) : null,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    requestPushPermission,
+    refresh: () => mutate(),
+  }
+}
 
 export function useNotifications() {
   const supabase = createClient()

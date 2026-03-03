@@ -1,13 +1,130 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+/**
+ * useCards — T2 Refactor
+ * Reads: useSWR + CardService (replaces manual useState+useEffect)
+ * Writes: CardService methods with SWR cache mutation
+ */
+
+import { useState, useEffect, useCallback } from 'react'
+import useSWR from 'swr'
 import { useCardStore } from '@/store/cards.store'
 import { useAuthStore } from '@/store/auth.store'
-import { cardQueries } from '@cevre/supabase'
-import type { InsertDto } from '@cevre/supabase'
+import { CardService } from '@/services/card.service'
+import { queryKeys } from '@/lib/query-keys'
 import { makeCardExpiry } from '@cevre/shared'
 import type { CardFormData } from '@cevre/shared'
+
+export function useCards() {
+  const { supabaseUser } = useAuthStore()
+  const {
+    selectedCard, activeCategory,
+    userLat, userLng,
+    selectCard, setCategory, setUserLocation,
+    addCard, setCards,
+  } = useCardStore()
+
+  // Geolocation
+  useEffect(() => {
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => setUserLocation(pos.coords.latitude, pos.coords.longitude),
+      () => setUserLocation(41.0082, 28.9784) // İstanbul fallback
+    )
+  }, [setUserLocation])
+
+  // ── SWR read: nearby cards ──────────────────────────────────────────────
+  const swrKey = userLat && userLng
+    ? queryKeys.nearbyCards(userLat, userLng, activeCategory ?? undefined)
+    : null
+
+  const { data: cards = [], isLoading, error: swrError, mutate } = useSWR(
+    swrKey,
+    () => CardService.getCards({ lat: userLat!, lng: userLng!, category: activeCategory ?? undefined })
+      .then(r => { if (r.error) throw r.error; return (r.data ?? []) as any[] }),
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  )
+
+  // Sync SWR data into Zustand store (for map/other consumers)
+  useEffect(() => {
+    if (cards.length) setCards(cards)
+  }, [cards, setCards])
+
+  // ── Realtime: new cards ─────────────────────────────────────────────────
+  useEffect(() => {
+    const channel = CardService.subscribeToNewCards((newCard) => {
+      addCard(newCard as any)
+      mutate()
+    })
+    return () => { channel.unsubscribe() }
+  }, [addCard, mutate])
+
+  // ── Write: create card ──────────────────────────────────────────────────
+  const createCard = useCallback(async (formData: CardFormData) => {
+    if (!supabaseUser) throw new Error('Giriş yapmanız gerekiyor')
+    if (!userLat || !userLng) throw new Error('Konumunuz alınamadı')
+
+    const { data, error } = await CardService.createCard({
+      title: formData.title.trim(),
+      description: formData.description?.trim() || '',
+      category: formData.category,
+      location: { lat: formData.lat, lng: formData.lng, address: formData.location_name },
+      max_participants: formData.max_participants,
+      scheduled_at: makeCardExpiry(formData.duration_hours),
+    })
+    if (error) throw new Error((error as any).message)
+    mutate()
+    return data
+  }, [supabaseUser, userLat, userLng, mutate])
+
+  // ── Write: request join (optimistic) ────────────────────────────────────
+  const requestJoin = useCallback(async (cardId: string) => {
+    if (!supabaseUser) throw new Error('Giriş yapmanız gerekiyor')
+    mutate(
+      cards.map(c => c.id === cardId
+        ? { ...c, participants_count: (c.participants_count ?? 0) + 1 }
+        : c),
+      { revalidate: false }
+    )
+    const { error } = await CardService.joinCard(cardId)
+    if (error) { mutate(); throw new Error((error as any).message) }
+  }, [supabaseUser, cards, mutate])
+
+  // ── Write: toggle like (optimistic) ─────────────────────────────────────
+  const toggleLike = useCallback(async (cardId: string) => {
+    if (!supabaseUser) return
+    const card = cards.find(c => c.id === cardId)
+    const isLiked = card?.is_liked ?? false
+    mutate(
+      cards.map(c => c.id === cardId
+        ? { ...c, is_liked: !isLiked, likes_count: (c.likes_count ?? 0) + (isLiked ? -1 : 1) }
+        : c),
+      { revalidate: false }
+    )
+    const { error } = await CardService.toggleLike(cardId)
+    if (error) mutate()
+  }, [supabaseUser, cards, mutate])
+
+  const filteredCards = activeCategory
+    ? cards.filter((c: any) => c.category === activeCategory)
+    : cards
+
+  return {
+    cards: filteredCards,
+    allCards: cards,
+    selectedCard,
+    activeCategory,
+    userLat,
+    userLng,
+    isLoading,
+    error: swrError ? String(swrError) : null,
+    selectCard,
+    setCategory,
+    createCard,
+    requestJoin,
+    toggleLike,
+    loadNearbyCards: () => mutate(),
+  }
+}
 
 export function useCards() {
   const supabase = createClient()
