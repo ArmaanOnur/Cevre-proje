@@ -48,6 +48,7 @@ export const queryKeys = {
 
   // Stories
   stories: (userId: string) => ['stories', userId] as const,
+  storyFeed: (userId: string) => ['stories', 'feed', userId] as const,
 } as const
 
 export type QueryKey = ReturnType<(typeof queryKeys)[keyof typeof queryKeys]>

@@ -3,32 +3,70 @@
 /**
  * /feed — Social Feed
  * Infinite scroll feed with posts, likes, and comments.
- * TODO T4: Post creation, media upload
+ * T4: Post creation modal wired ✅
  */
 
+import { useState } from 'react'
 import { useFeed } from '@/hooks/useFeed'
+import { useStories } from '@/hooks/useStories'
+import CreatePostModal from './CreatePostModal'
 
 export default function FeedPage() {
-  const { posts, isLoading, isLoadingMore, hasMore, loadMore } = useFeed()
+  const { posts, isLoading, isLoadingMore, hasMore, loadMore, toggleLike } = useFeed()
+  const { storyFeed, isLoading: storiesLoading } = useStories()
+  const [showCreatePost, setShowCreatePost] = useState(false)
 
   return (
     <div className="max-w-lg mx-auto">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-bold text-gray-900">Akış</h1>
-        <button className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition text-lg">
+        <button
+          onClick={() => setShowCreatePost(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition text-lg"
+          aria-label="Yeni gönderi oluştur"
+        >
           ✏️
         </button>
       </header>
 
-      {/* Stories row placeholder */}
+      {/* Stories row */}
       <div className="px-4 py-3 flex gap-3 overflow-x-auto scrollbar-none border-b border-gray-100 bg-white">
-        {[1,2,3,4,5].map(i => (
-          <div key={i} className="shrink-0 flex flex-col items-center gap-1">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 border-2 border-white ring-2 ring-emerald-300" />
-            <span className="text-[10px] text-gray-500 truncate w-14 text-center">Hikaye</span>
-          </div>
-        ))}
+        {storiesLoading ? (
+          // Skeleton
+          [1,2,3,4,5].map(i => (
+            <div key={i} className="shrink-0 flex flex-col items-center gap-1 animate-pulse">
+              <div className="w-14 h-14 rounded-full bg-gray-200" />
+              <div className="h-2 w-10 bg-gray-100 rounded-full" />
+            </div>
+          ))
+        ) : storyFeed.length === 0 ? (
+          // Placeholder when no stories
+          [1,2,3,4,5].map(i => (
+            <div key={i} className="shrink-0 flex flex-col items-center gap-1">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 border-2 border-white ring-2 ring-emerald-300" />
+              <span className="text-[10px] text-gray-400 truncate w-14 text-center">Hikaye</span>
+            </div>
+          ))
+        ) : (
+          storyFeed.map(item => (
+            <button
+              key={item.user_id}
+              className="shrink-0 flex flex-col items-center gap-1 cursor-pointer"
+            >
+              <div className={`w-14 h-14 rounded-full border-2 border-white ${item.has_unseen ? 'ring-2 ring-emerald-400' : 'ring-2 ring-gray-200'} overflow-hidden bg-gray-100`}>
+                {item.avatar_url ? (
+                  <img src={item.avatar_url} alt={item.full_name ?? ''} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
+                )}
+              </div>
+              <span className="text-[10px] text-gray-500 truncate w-14 text-center">
+                {item.full_name?.split(' ')[0] ?? item.username ?? 'Kullanıcı'}
+              </span>
+            </button>
+          ))
+        )}
       </div>
 
       {/* Feed posts */}
@@ -84,8 +122,11 @@ export default function FeedPage() {
 
                 {/* Post actions */}
                 <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-50">
-                  <button className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition">
-                    🤍 <span>{(post as any).like_count ?? 0}</span>
+                  <button
+                    onClick={() => toggleLike(post.id, (post as any).has_liked ?? false)}
+                    className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition"
+                  >
+                    {(post as any).has_liked ? '❤️' : '🤍'} <span>{(post as any).like_count ?? 0}</span>
                   </button>
                   <button className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-emerald-500 transition">
                     💬 <span>{(post as any).comment_count ?? 0}</span>
@@ -112,6 +153,11 @@ export default function FeedPage() {
           </>
         )}
       </div>
+
+      {/* Create Post Modal */}
+      {showCreatePost && (
+        <CreatePostModal onClose={() => setShowCreatePost(false)} />
+      )}
     </div>
   )
 }

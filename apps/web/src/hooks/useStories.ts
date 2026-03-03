@@ -1,130 +1,127 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
+/**
+ * useStories — T4 Refactor
+ * Reads: SWR-cached story feed
+ * Writes: StoryService mutations with optimistic updates
+ */
+
+import { useCallback } from 'react'
+import useSWR from 'swr'
 import { useAuth } from '@/hooks/useAuth'
+import { StoryService, type StoryFeedItem, type CreateStoryPayload } from '@/services/story.service'
+import { queryKeys } from '@/lib/query-keys'
+
+// ── Main hook ──────────────────────────────────────────────────────────────
 
 export function useStories() {
-  const supabase = createClient()
   const { user } = useAuth()
-  
-  const [storyFeed, setStoryFeed] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
 
-  // Load stories feed
-  const loadFeed = useCallback(async () => {
-    if (!user) return
-    
-    setIsLoading(true)
-    const { data } = await supabase.rpc('get_stories_feed', {
-      p_user_id: user.id,
-      p_limit: 50,
-    })
-    
-    setStoryFeed(data || [])
-    setIsLoading(false)
-  }, [supabase, user])
+  const feedKey = user ? queryKeys.storyFeed(user.id) : null
 
-  useEffect(() => {
-    loadFeed()
-  }, [loadFeed])
+  // SWR: 60 s revalidation — stories change frequently
+  const {
+    data: storyFeed = [],
+    isLoading,
+    error,
+    mutate,
+  } = useSWR<StoryFeedItem[]>(
+    feedKey,
+    () => StoryService.getFeed(user!.id),
+    { refreshInterval: 60_000, revalidateOnFocus: true }
+  )
 
-  // Create story
-  const createStory = useCallback(async (storyData: {
-    type: 'image' | 'video' | 'text'
-    media_url?: string
-    text_content?: string
-    stickers?: any[]
-    visibility?: 'public' | 'followers' | 'close_friends'
-  }) => {
+  // ── Write: create story ───────────────────────────────────────────────
+  const createStory = useCallback(async (payload: CreateStoryPayload) => {
     if (!user) throw new Error('Not authenticated')
-    
-    const { data, error } = await supabase.from('stories').insert({
-      user_id: user.id,
-      ...storyData,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    }).select().single()
-    
-    if (error) throw error
-    return data
-  }, [supabase, user])
+    const story = await StoryService.createStory(user.id, payload)
+    mutate() // refresh feed after creation
+    return story
+  }, [user, mutate])
 
-  // Mark story as viewed
-  const viewStory = useCallback(async (storyId: string, duration: number) => {
+  // ── Write: mark story as viewed ───────────────────────────────────────
+  const viewStory = useCallback(async (storyId: string, durationMs: number) => {
     if (!user) return
-    
-    await supabase.from('story_views').insert({
-      story_id: storyId,
-      user_id: user.id,
-      view_duration: duration,
-    })
-  }, [supabase, user])
+    await StoryService.viewStory(storyId, user.id, durationMs)
+    // Optimistically mark as seen in local data
+    mutate(
+      storyFeed.map(userStories => ({
+        ...userStories,
+        has_unseen: userStories.stories.some(
+          s => s.id !== storyId && !s.has_viewed
+        ),
+        stories: userStories.stories.map(s =>
+          s.id === storyId ? { ...s, has_viewed: true } : s
+        ),
+      })),
+      { revalidate: false }
+    )
+  }, [user, storyFeed, mutate])
 
-  // Get user stories
+  // ── Read: stories for a specific user ────────────────────────────────
   const getUserStories = useCallback(async (userId: string) => {
     if (!user) return []
-    
-    const { data } = await supabase.rpc('get_user_stories', {
-      p_user_id: userId,
-      p_viewer_id: user.id,
-    })
-    
-    return data || []
-  }, [supabase, user])
+    return StoryService.getUserStories(userId, user.id)
+  }, [user])
 
   return {
     storyFeed,
     isLoading,
+    error: error ? String(error) : null,
     createStory,
     viewStory,
     getUserStories,
-    refresh: loadFeed,
+    refresh: () => mutate(),
   }
 }
 
-// Hook for story highlights
-export function useHighlights(userId?: string) {
-  const supabase = createClient()
-  const { user } = useAuth()
-  const targetUserId = userId || user?.id
-  
-  const [highlights, setHighlights] = useState<any[]>([])
+// ── Highlights hook ───────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!targetUserId) return
-    
-    supabase
-      .from('story_highlights')
-      .select('*')
-      .eq('user_id', targetUserId)
-      .order('position')
-      .then(({ data }) => setHighlights(data || []))
-  }, [supabase, targetUserId])
+export function useHighlights(userId?: string) {
+  const { user } = useAuth()
+  const targetId = userId ?? user?.id
+
+  const {
+    data: highlights = [],
+    isLoading,
+    mutate,
+  } = useSWR(
+    targetId ? ['highlights', targetId] : null,
+    () => StoryService.getHighlights(targetId!),
+    { revalidateOnFocus: false }
+  )
 
   const createHighlight = useCallback(async (name: string, coverStoryId?: string) => {
     if (!user) throw new Error('Not authenticated')
-    
-    const { data, error } = await supabase.from('story_highlights').insert({
-      user_id: user.id,
-      name,
-      cover_story_id: coverStoryId,
-    }).select().single()
-    
-    if (error) throw error
-    setHighlights(prev => [...prev, data])
-    return data
-  }, [supabase, user])
+    const created = await StoryService.createHighlight(user.id, name, coverStoryId)
+    mutate([...highlights, created], { revalidate: false })
+    return created
+  }, [user, highlights, mutate])
 
   const addStoryToHighlight = useCallback(async (highlightId: string, storyId: string) => {
-    await supabase.from('highlight_stories').insert({
-      highlight_id: highlightId,
-      story_id: storyId,
-    })
-  }, [supabase])
+    await StoryService.addStoryToHighlight(highlightId, storyId)
+    mutate()
+  }, [mutate])
 
   return {
     highlights,
+    isLoading,
     createHighlight,
     addStoryToHighlight,
   }
+}
+
+// ── Story viewer hook (per-user ring data) ────────────────────────────────
+
+export function useUserStories(userId?: string) {
+  const { user } = useAuth()
+  const targetId = userId ?? user?.id
+
+  const { data: stories = [], isLoading } = useSWR(
+    targetId && user ? ['userStories', targetId, user.id] : null,
+    () => StoryService.getUserStories(targetId!, user!.id),
+    { revalidateOnFocus: false }
+  )
+
+  return { stories, isLoading }
 }

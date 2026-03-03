@@ -11,6 +11,7 @@ import useSWR from 'swr'
 import { useCardStore } from '@/store/cards.store'
 import { useAuthStore } from '@/store/auth.store'
 import { CardService } from '@/services/card.service'
+import { useGeolocation } from '@/hooks/useGeolocation'
 import { queryKeys } from '@/lib/query-keys'
 import { makeCardExpiry } from '@cevre/shared'
 import type { CardFormData } from '@cevre/shared'
@@ -24,13 +25,11 @@ export function useCards() {
     addCard, setCards,
   } = useCardStore()
 
-  // Geolocation
+  // Geolocation — extracted hook (T4)
+  const { lat, lng } = useGeolocation()
   useEffect(() => {
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => setUserLocation(pos.coords.latitude, pos.coords.longitude),
-      () => setUserLocation(41.0082, 28.9784) // İstanbul fallback
-    )
-  }, [setUserLocation])
+    if (lat !== null && lng !== null) setUserLocation(lat, lng)
+  }, [lat, lng, setUserLocation])
 
   // ── SWR read: nearby cards ──────────────────────────────────────────────
   const swrKey = userLat && userLng
