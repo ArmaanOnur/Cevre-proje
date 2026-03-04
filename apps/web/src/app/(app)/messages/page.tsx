@@ -5,19 +5,29 @@
  * Shows DMs and group chats with unread count badges.
  */
 
+import { useState } from 'react'
 import { useConversations } from '@/hooks/useConversations'
 import { useRouter } from 'next/navigation'
+import { NewConversationModal } from './NewConversationModal'
 
 export default function MessagesPage() {
   const { conversations, isLoading } = useConversations()
   const router = useRouter()
+  const [showNew, setShowNew] = useState(false)
 
   return (
     <div className="max-w-lg mx-auto">
+      {/* New conversation modal */}
+      {showNew && <NewConversationModal onClose={() => setShowNew(false)} />}
+
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-bold text-gray-900">Mesajlar</h1>
-        <button className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition text-lg">
+        <button
+          onClick={() => setShowNew(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition text-lg"
+          aria-label="Yeni mesaj"
+        >
           ✏️
         </button>
       </header>

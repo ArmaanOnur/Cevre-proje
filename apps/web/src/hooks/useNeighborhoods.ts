@@ -1,92 +1,97 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
+/**
+ * useNeighborhoods — T5 SWR Refactor
+ * Reads: useSWR + Supabase neighborhood queries
+ * Writes: join / leave with optimistic membership update
+ */
+
+import { useCallback } from 'react'
+import useSWR from 'swr'
 import { useAuth } from '@/hooks/useAuth'
+import { createClient } from '@/lib/supabase'
 import { neighborhoodQueries } from '@cevre/supabase'
+import { queryKeys } from '@/lib/query-keys'
 import type { Neighborhood, NeighborhoodRole } from '@cevre/supabase'
 
 export function useNeighborhoods(filters?: { city?: string; district?: string }) {
-  const supabase = createClient()
   const { user } = useAuth()
-  
-  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([])
-  const [myNeighborhoods, setMyNeighborhoods] = useState<{
-    neighborhood_id: string
-    role: NeighborhoodRole
-  }[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  // Mahalleleri yükle
-  const loadNeighborhoods = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  // ── SWR: all neighborhoods ──────────────────────────────────────────────
+  const {
+    data: neighborhoods = [],
+    isLoading,
+    error,
+    mutate: mutateNeighborhoods,
+  } = useSWR<Neighborhood[]>(
+    [queryKeys.neighborhoods(), filters?.city, filters?.district],
+    async () => {
+      const supabase = createClient()
       const { data, error } = await neighborhoodQueries.getAll(supabase, filters)
       if (error) throw error
-      setNeighborhoods(data ?? [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Mahalleler yüklenemedi')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [supabase, filters?.city, filters?.district]) // eslint-disable-line react-hooks/exhaustive-deps
+      return data ?? []
+    },
+    { revalidateOnFocus: false }
+  )
 
-  // Kullanıcının üyeliklerini yükle
-  const loadMyMemberships = useCallback(async () => {
-    if (!user) return
-    const { data } = await neighborhoodQueries.getMyNeighborhoods(supabase, user.id)
-    if (data) {
-      setMyNeighborhoods(
-        data.map((m: any) => ({
-          neighborhood_id: m.neighborhood.id,
-          role: m.role,
-        }))
-      )
-    }
-  }, [supabase, user])
+  // ── SWR: user's memberships ─────────────────────────────────────────────
+  const {
+    data: myNeighborhoods = [],
+    mutate: mutateMemberships,
+  } = useSWR<{ neighborhood_id: string; role: NeighborhoodRole }[]>(
+    user ? ['neighborhoods', 'mine', user.id] : null,
+    async () => {
+      const supabase = createClient()
+      const { data } = await neighborhoodQueries.getMyNeighborhoods(supabase, user!.id)
+      return (data ?? []).map((m: any) => ({
+        neighborhood_id: m.neighborhood.id,
+        role: m.role as NeighborhoodRole,
+      }))
+    },
+    { revalidateOnFocus: false }
+  )
 
-  useEffect(() => {
-    loadNeighborhoods()
-    loadMyMemberships()
-  }, [loadNeighborhoods, loadMyMemberships])
-
-  // Mahalleye katıl
+  // ── Write: join ─────────────────────────────────────────────────────────
   const joinNeighborhood = useCallback(async (neighborhoodId: string) => {
     if (!user) throw new Error('Giriş yapmanız gerekiyor')
+    const supabase = createClient()
     await neighborhoodQueries.join(supabase, neighborhoodId, user.id)
-    await loadMyMemberships()
-    await loadNeighborhoods()
-  }, [supabase, user, loadMyMemberships, loadNeighborhoods])
+    mutateMemberships()
+    mutateNeighborhoods()
+  }, [user, mutateMemberships, mutateNeighborhoods])
 
-  // Mahalleden ayrıl
+  // ── Write: leave ─────────────────────────────────────────────────────────
   const leaveNeighborhood = useCallback(async (neighborhoodId: string) => {
     if (!user) return
+    const supabase = createClient()
     await neighborhoodQueries.leave(supabase, neighborhoodId, user.id)
-    await loadMyMemberships()
-    await loadNeighborhoods()
-  }, [supabase, user, loadMyMemberships, loadNeighborhoods])
+    mutateMemberships(
+      myNeighborhoods.filter(m => m.neighborhood_id !== neighborhoodId),
+      { revalidate: false }
+    )
+    mutateNeighborhoods()
+  }, [user, myNeighborhoods, mutateMemberships, mutateNeighborhoods])
 
-  // Kullanıcı bu mahallenin üyesi mi?
-  const isMember = useCallback((neighborhoodId: string) => {
-    return myNeighborhoods.some(m => m.neighborhood_id === neighborhoodId)
-  }, [myNeighborhoods])
+  const isMember = useCallback(
+    (neighborhoodId: string) => myNeighborhoods.some(m => m.neighborhood_id === neighborhoodId),
+    [myNeighborhoods]
+  )
 
-  // Kullanıcının rolü
-  const getMyRole = useCallback((neighborhoodId: string): NeighborhoodRole | null => {
-    return myNeighborhoods.find(m => m.neighborhood_id === neighborhoodId)?.role ?? null
-  }, [myNeighborhoods])
+  const getMyRole = useCallback(
+    (neighborhoodId: string): NeighborhoodRole | null =>
+      myNeighborhoods.find(m => m.neighborhood_id === neighborhoodId)?.role ?? null,
+    [myNeighborhoods]
+  )
 
   return {
     neighborhoods,
     myNeighborhoods,
     isLoading,
-    error,
+    error: error ? String(error) : null,
     joinNeighborhood,
     leaveNeighborhood,
     isMember,
     getMyRole,
-    refresh: loadNeighborhoods,
+    refresh: () => { mutateNeighborhoods(); mutateMemberships() },
   }
 }

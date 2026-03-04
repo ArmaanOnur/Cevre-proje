@@ -1,7 +1,7 @@
-'use client'
+﻿'use client'
 
 /**
- * useFollow — T2 Refactor
+ * useFollow â€” T2 Refactor
  * Reads: useSWR + FollowService
  * Writes: optimistic follow/unfollow
  */
@@ -15,7 +15,7 @@ import { queryKeys } from '@/lib/query-keys'
 export function useFollow(targetUserId?: string) {
   const { user } = useAuth()
 
-  // ── SWR read: follow status ─────────────────────────────────────────────
+  // â”€â”€ SWR read: follow status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const swrKey = user && targetUserId && user.id !== targetUserId
     ? queryKeys.followStatus(user.id, targetUserId)
     : null
@@ -31,7 +31,7 @@ export function useFollow(targetUserId?: string) {
   const isMutual = status?.is_mutual ?? false
   const hasPendingRequest = status?.has_pending_request ?? false
 
-  // ── Write: follow (optimistic) ───────────────────────────────────────────
+  // â”€â”€ Write: follow (optimistic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const follow = useCallback(async () => {
     if (!user || !targetUserId) return
     mutate({ ...status, is_following: true, has_pending_request: false } as any, { revalidate: false })
@@ -40,7 +40,7 @@ export function useFollow(targetUserId?: string) {
     else mutate()  // refresh actual status (pending vs active)
   }, [user, targetUserId, status, mutate])
 
-  // ── Write: unfollow (optimistic) ─────────────────────────────────────────
+  // â”€â”€ Write: unfollow (optimistic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const unfollow = useCallback(async () => {
     if (!user || !targetUserId) return
     mutate({ ...status, is_following: false, is_mutual: false } as any, { revalidate: false })
@@ -48,7 +48,7 @@ export function useFollow(targetUserId?: string) {
     if (err) mutate()
   }, [user, targetUserId, status, mutate])
 
-  // ── Write: accept request ────────────────────────────────────────────────
+  // â”€â”€ Write: accept request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const acceptRequest = useCallback(async (followerId: string) => {
     await FollowService.acceptRequest(followerId)
     mutate()
@@ -64,86 +64,5 @@ export function useFollow(targetUserId?: string) {
     follow,
     unfollow,
     acceptRequest,
-  }
-}
-
-export function useFollow(targetUserId?: string) {
-  const supabase = createClient()
-  const { user } = useAuth()
-  
-  const [isFollowing, setIsFollowing] = useState(false)
-  const [isFollower, setIsFollower] = useState(false)
-  const [isMutual, setIsMutual] = useState(false)
-  const [hasPendingRequest, setHasPendingRequest] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Check follow status
-  const checkStatus = useCallback(async () => {
-    if (!user || !targetUserId || user.id === targetUserId) return
-    
-    setIsLoading(true)
-    try {
-      const status = await followQueries.checkStatus(supabase, user.id, targetUserId)
-      setIsFollowing(status.is_following)
-      setIsFollower(status.is_follower)
-      setIsMutual(status.is_mutual)
-      setHasPendingRequest(status.has_pending_request)
-    } catch (err) {
-      console.error('Follow status check error:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [supabase, user, targetUserId])
-
-  useEffect(() => {
-    checkStatus()
-  }, [checkStatus])
-
-  // Follow
-  const follow = useCallback(async () => {
-    if (!user || !targetUserId) return
-    
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      const { error } = await followQueries.follow(supabase, targetUserId, user.id)
-      if (error) throw error
-      await checkStatus()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Takip edilemedi')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [supabase, user, targetUserId, checkStatus])
-
-  // Unfollow
-  const unfollow = useCallback(async () => {
-    if (!user || !targetUserId) return
-    
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      const { error } = await followQueries.unfollow(supabase, targetUserId, user.id)
-      if (error) throw error
-      await checkStatus()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Takipten çıkılamadı')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [supabase, user, targetUserId, checkStatus])
-
-  return {
-    isFollowing,
-    isFollower,
-    isMutual,
-    hasPendingRequest,
-    isLoading,
-    error,
-    follow,
-    unfollow,
   }
 }
