@@ -23,21 +23,23 @@ export default function FeedPage() {
   const [showCreatePost, setShowCreatePost] = useState(false)
 
   return (
-    <div className="max-w-lg mx-auto">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Akış</h1>
+    <div className="max-w-xl mx-auto">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="sticky top-0 z-10 glass border-b border-slate-100 px-4 h-14 flex items-center justify-between">
+        <h1 className="text-lg font-bold text-slate-900">Akış</h1>
         <button
           onClick={() => setShowCreatePost(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition text-lg"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 transition shadow-sm shadow-emerald-200"
           aria-label="Yeni gönderi oluştur"
         >
-          ✏️
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
         </button>
       </header>
 
-      {/* Stories row */}
-      <div className="px-4 py-3 flex gap-3 overflow-x-auto scrollbar-none border-b border-gray-100 bg-white">
+      {/* ── Stories ────────────────────────────────────────── */}
+      <div className="bg-white border-b border-slate-100 px-4 py-3 flex gap-3 overflow-x-auto scrollbar-none">
         {storiesLoading ? (
           // Skeleton
           [1,2,3,4,5].map(i => (
@@ -75,70 +77,77 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* Feed posts */}
-      <div className="px-4 py-2 space-y-4">
+      {/* ── Feed posts ─────────────────────────────────────── */}
+      <div className="px-4 py-3 space-y-3">
         {isLoading ? (
           <>
             {[1,2,3].map(i => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3 animate-pulse">
+              <div key={i} className="bg-white rounded-2xl shadow-card p-4 space-y-3 animate-pulse">
                 <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-200" />
+                  <div className="w-10 h-10 rounded-full bg-slate-200" />
                   <div className="flex-1 space-y-2 pt-1">
-                    <div className="h-3.5 bg-gray-200 rounded-full w-1/3" />
-                    <div className="h-2.5 bg-gray-100 rounded-full w-1/4" />
+                    <div className="h-3.5 bg-slate-200 rounded-full w-1/3" />
+                    <div className="h-2.5 bg-slate-100 rounded-full w-1/4" />
                   </div>
                 </div>
-                <div className="h-32 bg-gray-100 rounded-xl" />
-                <div className="h-2.5 bg-gray-100 rounded-full w-3/4" />
+                <div className="h-28 bg-slate-100 rounded-xl" />
               </div>
             ))}
           </>
         ) : posts.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="text-center py-20">
             <p className="text-4xl mb-3">🌱</p>
-            <p className="font-semibold text-gray-700">Henüz gönderi yok</p>
-            <p className="text-sm text-gray-400 mt-1">İlk gönderiyi sen paylaş!</p>
+            <p className="font-semibold text-slate-700">Henüz gönderi yok</p>
+            <p className="text-sm text-slate-400 mt-1">İlk gönderiyi sen paylaş!</p>
           </div>
         ) : (
           <>
             {posts.map(post => (
-              <article key={post.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <article key={post.id} className="bg-white rounded-2xl shadow-card overflow-hidden card-lift">
                 {/* Post header */}
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-lg overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-lg overflow-hidden shrink-0">
                     {(post as any).users?.avatar_url ? (
                       <img src={(post as any).users.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : '👤'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
                       {(post as any).users?.full_name ?? 'Kullanıcı'}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-slate-400">
                       {new Date(post.created_at ?? '').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
                     </p>
                   </div>
-                  <button className="text-gray-400 hover:text-gray-600 text-lg">⋯</button>
+                  <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition text-lg">⋯</button>
                 </div>
 
                 {/* Post content */}
                 {post.content && (
-                  <p className="px-4 pb-3 text-sm text-gray-700 leading-relaxed">{post.content}</p>
+                  <p className="px-4 pb-3 text-sm text-slate-700 leading-relaxed">{post.content}</p>
                 )}
 
                 {/* Post actions */}
-                <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-50">
+                <div className="flex items-center gap-1 px-3 py-2 border-t border-slate-50">
                   <button
                     onClick={() => toggleLike(post.id, (post as any).has_liked ?? false)}
-                    className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition"
+                    className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl transition ${
+                      (post as any).has_liked
+                        ? 'text-rose-600 bg-rose-50'
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
                   >
-                    {(post as any).has_liked ? '❤️' : '🤍'} <span>{(post as any).like_count ?? 0}</span>
+                    {(post as any).has_liked ? '❤️' : '🤍'}
+                    <span className="font-medium">{(post as any).like_count ?? 0}</span>
                   </button>
-                  <button className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-emerald-500 transition">
-                    💬 <span>{(post as any).comment_count ?? 0}</span>
+                  <button className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl text-slate-500 hover:bg-slate-50 transition">
+                    💬 <span className="font-medium">{(post as any).comment_count ?? 0}</span>
                   </button>
-                  <button className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-500 transition ml-auto">
-                    ↗️ Paylaş
+                  <button className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl text-slate-500 hover:bg-slate-50 transition ml-auto">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                    </svg>
+                    Paylaş
                   </button>
                 </div>
               </article>
@@ -150,7 +159,7 @@ export default function FeedPage() {
                 <button
                   onClick={loadMore}
                   disabled={isLoadingMore}
-                  className="px-6 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+                  className="px-6 py-2.5 bg-white shadow-card border border-slate-100 rounded-full text-sm font-medium text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
                 >
                   {isLoadingMore ? '⏳ Yükleniyor…' : 'Daha fazla göster'}
                 </button>

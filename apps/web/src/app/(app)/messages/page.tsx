@@ -22,19 +22,21 @@ export default function MessagesPage() {
   const [showNew, setShowNew] = useState(false)
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-xl mx-auto">
       {/* New conversation modal */}
       {showNew && <NewConversationModal onClose={() => setShowNew(false)} />}
 
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Mesajlar</h1>
+      <header className="sticky top-0 z-10 glass border-b border-slate-100 px-4 h-14 flex items-center justify-between">
+        <h1 className="text-lg font-bold text-slate-900">Mesajlar</h1>
         <button
           onClick={() => setShowNew(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition text-lg"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-violet-500 text-white hover:bg-violet-600 active:scale-95 transition shadow-sm shadow-violet-200"
           aria-label="Yeni mesaj"
         >
-          ✏️
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
         </button>
       </header>
 

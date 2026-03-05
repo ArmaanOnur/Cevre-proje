@@ -53,21 +53,23 @@ export default function AuthPage() {
 
   return (
     <>
-      <h2 className="text-xl font-semibold text-gray-900 mb-1">Giriş yap</h2>
-      <p className="text-sm text-gray-500 mb-6">
+      <h2 className="text-xl font-bold text-slate-900 mb-1">Giriş yap</h2>
+      <p className="text-sm text-slate-500 mb-6 leading-relaxed">
         Telefon numaranı gir, sana doğrulama kodu gönderelim.
       </p>
 
       <form onSubmit={handleSubmit} noValidate>
-        {/* Phone input with Turkey flag prefix */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        {/* Phone input */}
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">
             Telefon numarası
           </label>
           <div className="flex gap-2">
-            <div className="flex items-center gap-1.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shrink-0 select-none">
-              🇹🇷 +90
+            {/* Country prefix */}
+            <div className="flex items-center gap-1.5 px-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-700 shrink-0 select-none">
+              🇹🇷 <span className="text-slate-500">+90</span>
             </div>
+            {/* Number input */}
             <input
               type="tel"
               inputMode="numeric"
@@ -76,18 +78,21 @@ export default function AuthPage() {
               value={formatDisplay(phone)}
               onChange={handleChange}
               disabled={isPending}
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-2xl text-base text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           {error && (
-            <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>
+            <p className="mt-2 text-sm text-red-500 flex items-center gap-1.5" role="alert">
+              <span className="text-base">⚠️</span> {error}
+            </p>
           )}
         </div>
 
+        {/* Submit button */}
         <button
           type="submit"
           disabled={isPending || phone.length < 10}
-          className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-2xl shadow-sm shadow-emerald-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
         >
           {isPending ? (
             <span className="flex items-center justify-center gap-2">
@@ -97,15 +102,9 @@ export default function AuthPage() {
               </svg>
               Kod gönderiliyor…
             </span>
-          ) : 'Kod gönder'}
+          ) : 'Kod gönder →'}
         </button>
       </form>
-
-      <p className="mt-5 text-center text-xs text-gray-400">
-        Devam ederek{' '}
-        <a href="#" className="underline text-gray-500">Kullanım Koşulları</a>'nı ve{' '}
-        <a href="#" className="underline text-gray-500">Gizlilik Politikası</a>'nı kabul edersin.
-      </p>
     </>
   )
 }

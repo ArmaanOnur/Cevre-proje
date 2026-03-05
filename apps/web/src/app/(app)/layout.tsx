@@ -1,22 +1,27 @@
 /**
  * (app)/layout.tsx — Authenticated app shell
- * Wraps all protected routes (/map, /feed, /messages, /notifications, /profile).
- * - Server component: reads session for SSR
- * - AuthGuard: client-side protection fallback
- * - BottomNav: mobile tab navigation
+ * - Mobile:  BottomNav (fixed bottom) — SideNav hidden
+ * - Desktop: SideNav (fixed left 240px) — BottomNav hidden
  */
 
 import { AuthGuard } from './components/AuthGuard'
 import { BottomNav } from './components/BottomNav'
+import { SideNav }   from './components/SideNav'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      {/* Main content area — pb-16 leaves room for BottomNav */}
-      <div className="min-h-screen bg-gray-50 pb-16">
+      {/* Desktop sidebar */}
+      <SideNav />
+
+      {/* Main content — offset by sidebar width on desktop, padded for BottomNav on mobile */}
+      <div className="min-h-screen bg-slate-50 pb-[60px] md:pb-0 md:pl-60">
         {children}
       </div>
+
+      {/* Mobile bottom nav */}
       <BottomNav />
     </AuthGuard>
   )
 }
+
