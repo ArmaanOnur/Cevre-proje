@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase'
+import { eventBus, makeEvent } from '@/lib/event-bus'
 
 export interface FollowStatus {
   is_following: boolean
@@ -64,6 +65,13 @@ export class FollowService {
     const { error } = await db
       .from('follows')
       .upsert({ follower_id: user.id, following_id: targetId, status })
+    if (!error) {
+      eventBus.emit(makeEvent('USER_FOLLOWED', {
+        followerId: user.id,
+        followingId: targetId,
+        status: status as 'active' | 'pending',
+      }))
+    }
     return { error, status }
   }
 
@@ -78,6 +86,9 @@ export class FollowService {
       .delete()
       .eq('follower_id', user.id)
       .eq('following_id', targetId)
+    if (!error) {
+      eventBus.emit(makeEvent('USER_UNFOLLOWED', { followerId: user.id, followingId: targetId }))
+    }
     return { error }
   }
 
@@ -93,6 +104,9 @@ export class FollowService {
       .eq('follower_id', followerId)
       .eq('following_id', user.id)
       .eq('status', 'pending')
+    if (!error) {
+      eventBus.emit(makeEvent('FOLLOW_ACCEPTED', { followerId, followingId: user.id }))
+    }
     return { error }
   }
 

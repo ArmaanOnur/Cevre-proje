@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@/lib/supabase'
+import { eventBus, makeEvent } from '@/lib/event-bus'
 
 export interface CardFilters {
   category?: string
@@ -105,6 +106,15 @@ export class CardService {
       })
       .select()
       .single()
+    if (!error && data) {
+      eventBus.emit(makeEvent('CARD_CREATED', {
+        cardId: data.id,
+        creatorId: user.id,
+        category: payload.category,
+        lat: payload.location.lat,
+        lng: payload.location.lng,
+      }))
+    }
     return { data, error }
   }
 

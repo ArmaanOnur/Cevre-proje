@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@/lib/supabase'
+import { eventBus, makeEvent } from '@/lib/event-bus'
 
 export class MessagingService {
   private static get db() {
@@ -145,6 +146,14 @@ export class MessagingService {
       })
       .select()
       .single()
+    if (!error && data) {
+      eventBus.emit(makeEvent('MESSAGE_SENT', {
+        messageId: data.id,
+        conversationId: payload.conversationId,
+        senderId: user.id,
+        messageType: (['image', 'file', 'voice'].includes(payload.type ?? '') ? payload.type : 'text') as 'text' | 'image' | 'file' | 'voice',
+      }))
+    }
     return { data, error }
   }
 

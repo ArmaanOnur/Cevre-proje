@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase'
+import { eventBus, makeEvent } from '@/lib/event-bus'
 
 export class FeedService {
   private static get db() {
@@ -60,6 +61,14 @@ export class FeedService {
       })
       .select()
       .single()
+    if (!error && data) {
+      eventBus.emit(makeEvent('POST_CREATED', {
+        postId: data.id,
+        authorId: user.id,
+        postType: (data.post_type ?? 'text') as 'text' | 'image' | 'video' | 'activity',
+        visibility: (data.visibility ?? 'public') as 'public' | 'followers' | 'private',
+      }))
+    }
     return { data, error }
   }
 
@@ -74,6 +83,9 @@ export class FeedService {
       .delete()
       .eq('id', postId)
       .eq('user_id', user.id)
+    if (!error) {
+      eventBus.emit(makeEvent('POST_DELETED', { postId, authorId: user.id }))
+    }
     return { error }
   }
 
@@ -132,6 +144,14 @@ export class FeedService {
       .insert({ post_id: postId, user_id: user.id, content, parent_id: parentId ?? null })
       .select()
       .single()
+    if (!error && data) {
+      eventBus.emit(makeEvent('COMMENT_ADDED', {
+        commentId: data.id,
+        postId,
+        authorId: user.id,
+        postAuthorId: data.post_author_id ?? '',
+      }))
+    }
     return { data, error }
   }
 

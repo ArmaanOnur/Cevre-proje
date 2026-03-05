@@ -104,6 +104,23 @@ export class NotificationService {
     )
   }
 
+  /**
+   * Insert a notification row for a target user.
+   * Uses 'system' type (the enum's generic bucket) for social events
+   * until the schema is extended with dedicated follow/like types.
+   */
+  static async create(
+    recipientId: string,
+    title: string,
+    body: string,
+    data?: Record<string, unknown>
+  ) {
+    const { error } = await this.db
+      .from('notifications')
+      .insert({ user_id: recipientId, type: 'system', title, body, data: data ?? null })
+    return { error }
+  }
+
   /** Subscribe to realtime notification inserts */
   static subscribe(
     userId: string,

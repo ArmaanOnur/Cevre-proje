@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase'
+import { eventBus, makeEvent } from '@/lib/event-bus'
 
 export interface StoryFeedItem {
   user_id: string
@@ -83,6 +84,11 @@ export const StoryService = {
       .select()
       .single()
     if (error) throw error
+    eventBus.emit(makeEvent('STORY_UPLOADED', {
+      storyId: data.id,
+      authorId: userId,
+      mediaType: (payload.type === 'video' ? 'video' : 'image') as 'image' | 'video',
+    }))
     return data
   },
 
