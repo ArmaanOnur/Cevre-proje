@@ -12,8 +12,13 @@ import { useGeolocation } from '@/hooks/useGeolocation'
 import { useCardStore } from '@/store/cards.store'
 import { ACTIVITY_CATEGORIES, CATEGORY_MAP } from '@cevre/shared'
 import { env } from '@/lib/env'
-import CreateCardModal from './CreateCardModal'
 import type { MapCard } from './MapboxMap'
+
+// T8: Lazy-load the multi-step create modal — only needed after map click
+const CreateCardModal = dynamic(() => import('./CreateCardModal'), {
+  ssr: false,
+  loading: () => null,
+})
 
 // Mapbox uses browser-only APIs — disable SSR
 const MapboxMap = dynamic(() => import('./MapboxMap'), {

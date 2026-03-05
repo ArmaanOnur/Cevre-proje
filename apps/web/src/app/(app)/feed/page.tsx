@@ -7,9 +7,15 @@
  */
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useFeed } from '@/hooks/useFeed'
 import { useStories } from '@/hooks/useStories'
-import CreatePostModal from './CreatePostModal'
+
+// T8: Lazy-load the heavy modal — not needed on initial paint
+const CreatePostModal = dynamic(() => import('./CreatePostModal'), {
+  ssr: false,
+  loading: () => null,
+})
 
 export default function FeedPage() {
   const { posts, isLoading, isLoadingMore, hasMore, loadMore, toggleLike } = useFeed()

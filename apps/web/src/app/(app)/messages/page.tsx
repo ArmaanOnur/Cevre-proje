@@ -6,9 +6,15 @@
  */
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useConversations } from '@/hooks/useConversations'
 import { useRouter } from 'next/navigation'
-import { NewConversationModal } from './NewConversationModal'
+
+// T8: Lazy-load search modal — only needed when user taps compose button
+const NewConversationModal = dynamic(
+  () => import('./NewConversationModal').then(m => ({ default: m.NewConversationModal })),
+  { ssr: false, loading: () => null },
+)
 
 export default function MessagesPage() {
   const { conversations, isLoading } = useConversations()
