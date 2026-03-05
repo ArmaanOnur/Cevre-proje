@@ -11,6 +11,7 @@ import useSWR from 'swr'
 import { useCardStore } from '@/store/cards.store'
 import { useAuthStore } from '@/store/auth.store'
 import { CardService } from '@/services/card.service'
+import { commandBus } from '@/cqrs'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { queryKeys } from '@/lib/query-keys'
 import { makeCardExpiry } from '@cevre/shared'
@@ -62,13 +63,16 @@ export function useCards() {
     if (!supabaseUser) throw new Error('Giriş yapmanız gerekiyor')
     if (!userLat || !userLng) throw new Error('Konumunuz alınamadı')
 
-    const { data, error } = await CardService.createCard({
-      title: formData.title.trim(),
-      description: formData.description?.trim() || '',
-      category: formData.category,
-      location: { lat: formData.lat, lng: formData.lng, address: formData.location_name },
-      max_participants: formData.max_participants,
-      scheduled_at: makeCardExpiry(formData.duration_hours),
+    const { data, error } = await commandBus.dispatch({
+      type: 'CREATE_CARD',
+      payload: {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || '',
+        category: formData.category,
+        location: { lat: formData.lat, lng: formData.lng, address: formData.location_name },
+        max_participants: formData.max_participants,
+        scheduled_at: makeCardExpiry(formData.duration_hours),
+      },
     })
     if (error) throw new Error((error as any).message)
     mutate()
@@ -84,7 +88,7 @@ export function useCards() {
         : c),
       { revalidate: false }
     )
-    const { error } = await CardService.joinCard(cardId)
+    const { error } = await commandBus.dispatch({ type: 'JOIN_CARD', payload: { cardId } })
     if (error) { mutate(); throw new Error((error as any).message) }
   }, [supabaseUser, cards, mutate])
 

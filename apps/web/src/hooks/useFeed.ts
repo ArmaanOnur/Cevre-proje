@@ -10,6 +10,7 @@ import { useCallback } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import { useAuth } from '@/hooks/useAuth'
 import { FeedService } from '@/services/feed.service'
+import { commandBus } from '@/cqrs'
 import { queryKeys } from '@/lib/query-keys'
 import type { Post, ReactionType } from '@cevre/shared'
 
@@ -63,7 +64,7 @@ export function useFeed() {
     )
 
     try {
-      await FeedService.toggleLike(postId)
+      await commandBus.dispatch({ type: 'TOGGLE_LIKE', payload: { postId } })
     } catch {
       mutate() // rollback
     }
@@ -75,7 +76,7 @@ export function useFeed() {
       pages?.map(page => page.filter(p => p.id !== postId)),
       { revalidate: false }
     )
-    await FeedService.deletePost(postId)
+    await commandBus.dispatch({ type: 'DELETE_POST', payload: { postId } })
   }, [pages, mutate])
 
   // ── Write: create post ──────────────────────────────────────────────────
@@ -84,7 +85,7 @@ export function useFeed() {
     visibility?: 'public' | 'followers' | 'private'
     media_url?: string[]
   }) => {
-    const { data, error } = await FeedService.createPost(payload)
+    const { data, error } = await commandBus.dispatch({ type: 'CREATE_POST', payload })
     if (error) throw new Error((error as any).message)
     // Prepend new post to first page
     mutate(
@@ -96,7 +97,7 @@ export function useFeed() {
 
   // ── Write: add comment ───────────────────────────────────────────────────
   const addComment = useCallback(async (postId: string, content: string) => {
-    await FeedService.addComment(postId, content)
+    await commandBus.dispatch({ type: 'ADD_COMMENT', payload: { postId, content } })
     // Bump comment count optimistically
     mutate(
       pages?.map(page =>

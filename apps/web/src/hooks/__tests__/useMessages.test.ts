@@ -72,6 +72,18 @@ vi.mock('@/services/messaging.service', () => ({
   },
 }))
 
+// ── Mock: @/cqrs — commandBus routes SEND_MESSAGE to mockSendMessage ────
+vi.mock('@/cqrs', () => ({
+  commandBus: {
+    dispatch: vi.fn(async (cmd: { type: string; payload: Record<string, unknown> }) => {
+      if (cmd.type === 'SEND_MESSAGE') {
+        return mockSendMessage({ conversationId: cmd.payload.conversationId, content: cmd.payload.content })
+      }
+      return {}
+    }),
+  },
+}))
+
 // Import AFTER all mocks
 import { useMessages } from '../useMessages'
 import { useConversations } from '../useConversations'

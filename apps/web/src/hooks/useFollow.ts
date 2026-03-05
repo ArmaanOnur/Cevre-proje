@@ -10,6 +10,7 @@ import { useCallback } from 'react'
 import useSWR from 'swr'
 import { useAuth } from '@/hooks/useAuth'
 import { FollowService } from '@/services/follow.service'
+import { commandBus } from '@/cqrs'
 import { queryKeys } from '@/lib/query-keys'
 
 export function useFollow(targetUserId?: string) {
@@ -35,7 +36,7 @@ export function useFollow(targetUserId?: string) {
   const follow = useCallback(async () => {
     if (!user || !targetUserId) return
     mutate({ ...status, is_following: true, has_pending_request: false } as any, { revalidate: false })
-    const { error: err } = await FollowService.follow(targetUserId)
+    const { error: err } = await commandBus.dispatch({ type: 'FOLLOW_USER', payload: { targetId: targetUserId } })
     if (err) mutate()
     else mutate()  // refresh actual status (pending vs active)
   }, [user, targetUserId, status, mutate])
@@ -44,13 +45,13 @@ export function useFollow(targetUserId?: string) {
   const unfollow = useCallback(async () => {
     if (!user || !targetUserId) return
     mutate({ ...status, is_following: false, is_mutual: false } as any, { revalidate: false })
-    const { error: err } = await FollowService.unfollow(targetUserId)
+    const { error: err } = await commandBus.dispatch({ type: 'UNFOLLOW_USER', payload: { targetId: targetUserId } })
     if (err) mutate()
   }, [user, targetUserId, status, mutate])
 
   // â”€â”€ Write: accept request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const acceptRequest = useCallback(async (followerId: string) => {
-    await FollowService.acceptRequest(followerId)
+    await commandBus.dispatch({ type: 'ACCEPT_FOLLOW_REQUEST', payload: { followerId } })
     mutate()
   }, [mutate])
 

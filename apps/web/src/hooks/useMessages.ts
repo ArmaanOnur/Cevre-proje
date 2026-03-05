@@ -10,6 +10,7 @@ import { useEffect, useCallback, useRef } from 'react'
 import useSWR from 'swr'
 import { useAuth } from '@/hooks/useAuth'
 import { MessagingService } from '@/services/messaging.service'
+import { commandBus } from '@/cqrs'
 import { queryKeys } from '@/lib/query-keys'
 import type { Message } from '@cevre/shared'
 
@@ -56,7 +57,7 @@ export function useMessages(conversationId: string) {
     mutate(prev => [...(prev ?? []), optimistic], { revalidate: false })
 
     try {
-      await MessagingService.sendMessage({ conversationId, content: text })
+      await commandBus.dispatch({ type: 'SEND_MESSAGE', payload: { conversationId, content: text } })
       await MessagingService.setTyping(conversationId, false)
     } catch {
       mutate() // rollback on error

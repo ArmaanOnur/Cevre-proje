@@ -12,11 +12,17 @@
 
 import { useEffect } from 'react'
 import { registerEventHandlers } from '@/lib/event-handlers'
+import { setupCQRS } from '@/cqrs'
 
 export function EventHandlerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const cleanup = registerEventHandlers()
-    return cleanup
+    // CQRS must be set up before event handlers (handlers may dispatch commands)
+    const cleanupCQRS = setupCQRS()
+    const cleanupEvents = registerEventHandlers()
+    return () => {
+      cleanupEvents()
+      cleanupCQRS()
+    }
   }, [])
 
   return <>{children}</>
